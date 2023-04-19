@@ -5,29 +5,54 @@ import json
 import subprocess
 import tempfile
 import time
-
-
-api_key = "sk-"
+import traceback
+import itertools
+#   gpt-3.5-turbo
+#       ##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 ## grove
+##       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  ## breakmelegs
+     #personal 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 ## personal
+    #itmsop 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 ## itmsp
+        
+#make a simple calculator and a test function that will test it and print the results
+api_key = "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"
 
 code_file_counter = 0
+
 
 
 class Chatbot:
     def __init__(self, api_key, model):
         self.api_key = api_key
         self.model = model
+        
+    def trim_conversation(self, conversation, tokens_to_trim):
+        conversation_length = sum(len(msg["content"]) for msg in conversation.messages)
+        while conversation_length > 4096 - tokens_to_trim:
+            # Remove the second oldest message (index 1) while keeping the system message
+            conversation.messages.pop(1)
+            conversation_length = sum(len(msg["content"]) for msg in conversation.messages)
 
     def chat_completion_api(self, conversation):
         openai.api_key = self.api_key
 
         messages = [{"role": message["role"], "content": message["content"]} for message in conversation.messages]
 
+        if len(messages) < 2:
+            raise ValueError("There must be at least two messages in the conversation.")
+
+        tokens_to_trim = 0
+        num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
+
+        if num_tokens > 4096:
+            self.trim_conversation(conversation, tokens_to_trim)
+            num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
+
         while True:
             try:
                 response = openai.ChatCompletion.create(
-                                model="gpt-3.5-turbo",
-                                messages=messages
-                                ##rest of model arguments
+                    model="gpt-3.5-turbo",
+                    messages=messages
+                    ##rest of model arguments
                 )
                 content = response['choices'][0]['message']['content']
 
@@ -36,6 +61,12 @@ class Chatbot:
             except openai.error.RateLimitError:
                 print("Rate limit error encountered. Waiting for 20 seconds before retrying...")
                 time.sleep(20)
+            except openai.error.InvalidRequestError as e:
+                print("InvalidRequestError occurred:", e)
+                tokens_to_trim += 200
+                self.trim_conversation(conversation, tokens_to_trim)
+                time.sleep(20)
+                return self.chat_completion_api(conversation)
 
 
 
@@ -76,6 +107,7 @@ def get_multiline_input(prompt, end_word):
         lines.append(line)
     print("Sent message to API...")
     return '\n'.join(lines)
+
 
 
 
@@ -127,7 +159,8 @@ def execute_code_and_get_output(code, file_counter):
                     break
 
         except Exception as e:
-            output += str(e)
+            tb_str = traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__)
+            output += "".join(tb_str)
 
         # Close the duplicated file descriptor
         stdin_copy.close()
@@ -197,7 +230,7 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
 
 def interact_chat(conversation, chatbot, filename, sys_message=None, auto_prompt=False, feedback_chatbot=None):
     try:
-        if sys_message == '':
+        if sys_message == None:
             sys_message = "You are a python programmer bot, you strive to give complete, coherent, printful verbose and bug free code. Always provide the complete code, not in parts, the entire thing, Make the code a single block"
 
         conversation.add_message("system", sys_message)
@@ -252,13 +285,14 @@ def main(api_key, code_file_counter):
     chatbot = Chatbot(api_key, model)
     feedback_chatbot = Chatbot(api_key, model)
     sys_message = None
-    sys_message = input("What is the system message? : ")
+    if input("Do you want use a custom system message?? y/n): ") == "n":
+        sys_message = input("What is the system message you want to use? : ")
 
     auto_prompt = input("Would you like to risk your computer? (y/n): ").lower() == "y"
     auto_prompt_sys_message = None
     
         
-
+##continuously run?
 
             
 
