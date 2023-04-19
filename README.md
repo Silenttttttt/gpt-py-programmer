@@ -11,9 +11,11 @@ OpenAI Python Library: Install it with `pip install openai`
 
 
 How the program works:
+
 The program simulates a conversation between the user and the chatbot.
 The user inputs a message, and the chatbot processes it and generates a response
 If the response contains Python code, the program can execute that code and incorporate the output into the conversation, allowing the chatbot to run code and correct its own errors.
+
 
 How to Use the Program:
 
@@ -26,11 +28,17 @@ Run the program with `python dangerous-ai.py`.
 
 
 
+
 Key components of the program:
+
 `Chatbot`: A class that represents a chatbot, with methods for interacting with the OpenAI API and handling the conversation.
+
 `Conversation`: A class that manages the conversation, keeping track of messages and their roles (user, assistant, or system).
+
 `execute_code_and_get_output`: A function that takes Python code as input, executes it, and returns the output.
+
 `autoprompt_v2`: A function that handles code execution and incorporates the output into the conversation.
+
 
 
 `User Inputs`:
