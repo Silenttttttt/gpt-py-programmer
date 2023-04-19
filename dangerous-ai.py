@@ -7,14 +7,8 @@ import tempfile
 import time
 import traceback
 import itertools
-#   gpt-3.5-turbo
-#       ##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 ## grove
-##       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  ## breakmelegs
-     #personal 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 ## personal
-    #itmsop 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 ## itmsp
-        
-#make a simple calculator and a test function that will test it and print the results
-api_key = "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"
+
+api_key = "sk-"
 
 code_file_counter = 0
 
