@@ -54,14 +54,16 @@ New or existing conversation: Choose whether to create a new conversation or loa
 To stop the program, press `CTRL + C` in the terminal.
 
 `Example inputs`
-Inputs like these produce good results because it allows the AI to have feedback on the code's success.
+Inputs: like these produce good results because it allows the AI to have feedback on the code's success.
         "make a simple calculator and a test function that will test it and print the results"
 
-Also, `input()` causes problems
+
 
 Note:
 
 WARNING: This program can potentially execute harmful code. Please use it with caution and review the generated code before execution.
 When the token count reaches 4k, the program will halt. A feature to forget past messages will be implemented at some point.
+
+Also, `input()` causes problems
 
 Enjoy interacting with the chatbot and exploring the power of code execution!
