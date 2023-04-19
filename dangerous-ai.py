@@ -1,9 +1,11 @@
 import os
+import sys
 import openai
 import json
 import subprocess
 import tempfile
 import time
+
 
 api_key = "sk-"
 
@@ -32,8 +34,8 @@ class Chatbot:
                 conversation.add_message("assistant", content)
                 return {"response": content}
             except openai.error.RateLimitError:
-                print("Rate limit error encountered. Waiting for 30 seconds before retrying...")
-                time.sleep(30)
+                print("Rate limit error encountered. Waiting for 20 seconds before retrying...")
+                time.sleep(20)
 
 
 
@@ -78,6 +80,8 @@ def get_multiline_input(prompt, end_word):
 
 
 
+
+
 def execute_code_and_get_output(code, file_counter):
     global code_file_counter
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".py") as temp:
@@ -89,13 +93,58 @@ def execute_code_and_get_output(code, file_counter):
         with open(file_name, "w") as f:
             f.write(code)
 
+        # Duplicate the standard input file descriptor
+        stdin_fd = os.dup(0)
+        stdin_copy = os.fdopen(stdin_fd, "r")
+
+        # Use Popen to interact with the executed code
+        process = subprocess.Popen(
+            ["python", temp.name],
+            stdin=stdin_copy,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        # Initialize an empty output string
+        output = ""
+
         try:
-            output = subprocess.check_output(["python", temp.name], stderr=subprocess.STDOUT, text=True)
-        except subprocess.CalledProcessError as e:
-            output = e.output
+            while process.poll() is None:  # While the process is running
+                try:
+                    # Non-blocking read from stdout
+                    stdout_line = process.stdout.readline()
+                    if stdout_line:
+                        print(stdout_line, end="")
+                        output += stdout_line
+
+                except KeyboardInterrupt:
+                    # Terminate the process on KeyboardInterrupt (Ctrl+C)
+                    process.terminate()
+                    process.wait()
+                    print("Code execution interrupted by user.")
+                    output += "Code execution interrupted by user."
+                    break
+
+        except Exception as e:
+            output += str(e)
+
+        # Close the duplicated file descriptor
+        stdin_copy.close()
+
+        # Read remaining data from stderr
+        stderr_data = process.stderr.read()
+        if stderr_data:
+            print(stderr_data, end="")
+            output += stderr_data
+
+        # Cleanup
+        process.stdout.close()
+        process.stderr.close()
 
     code_file_counter += 1
     return output
+
 
 
 def autoprompt_v2(conversation, chatbot, filename, file_counter):
