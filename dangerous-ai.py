@@ -7,14 +7,9 @@ import tempfile
 import time
 import traceback
 import itertools
-#   gpt-3.5-turbo
-#       ##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 ## grove
-##       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  ## breakmelegs
-     #personal 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 ## personal
-    #itmsop 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 ## itmsp
-        
-#make a simple calculator and a test function that will test it and print the results
-api_key = "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"
+
+
+api_key = "sk-"
 
 code_file_counter = 0
 
@@ -27,9 +22,13 @@ class Chatbot:
         
     def trim_conversation(self, conversation, tokens_to_trim):
         conversation_length = sum(len(msg["content"]) for msg in conversation.messages)
-        while conversation_length > 4096 - tokens_to_trim:
-            # Remove the second oldest message (index 1) while keeping the system message
-            conversation.messages.pop(1)
+        while conversation_length > 3700 - tokens_to_trim:
+            if len(conversation.messages) > 6:
+                # Remove the third oldest message (index 2) while keeping the system message
+                conversation.messages.pop(2)
+            else:
+                # Remove the second oldest message (index 1) while keeping the system message
+                conversation.messages.pop(1)
             conversation_length = sum(len(msg["content"]) for msg in conversation.messages)
 
     def chat_completion_api(self, conversation):
@@ -43,7 +42,8 @@ class Chatbot:
         tokens_to_trim = 0
         num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
 
-        if num_tokens > 4096:
+        while num_tokens > 3700:
+            tokens_to_trim += 200
             self.trim_conversation(conversation, tokens_to_trim)
             num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
 
@@ -67,6 +67,8 @@ class Chatbot:
                 self.trim_conversation(conversation, tokens_to_trim)
                 time.sleep(20)
                 return self.chat_completion_api(conversation)
+
+
 
 
 
@@ -116,7 +118,9 @@ def get_multiline_input(prompt, end_word):
 
 def execute_code_and_get_output(code, file_counter):
     global code_file_counter
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".py") as temp:
+    temp_dir = "temp"
+    os.makedirs(temp_dir, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", dir=temp_dir) as temp:
         temp.write(code)
         temp.flush()
 
@@ -180,6 +184,7 @@ def execute_code_and_get_output(code, file_counter):
 
 
 
+
 def autoprompt_v2(conversation, chatbot, filename, file_counter):
     last_message = conversation.messages[-1]["content"]
     print(last_message)
@@ -194,6 +199,7 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
 
     if code_start != -1 and code_end != -1:
         python_code = last_message[code_start + (len("```python") if "```python" in last_message else len("```")):code_end].strip()
+        python_code = python_code.lstrip("python").strip()  # Remove "python" from the start of the code block
         print("---")
         print("Python code to execute:")
         print(python_code)
@@ -205,7 +211,8 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
         print(code_output)
 
         # Add the executed code to the message before the output
-        code_output = f"Executed code:\n```\n{python_code}\n```\nOutput:\n{code_output}"
+        code_output = f"Executed code: \" \n```\n{python_code}\n```\n\" Output:\n{code_output} \" Make sure you give the entire code"
+
 
         # Add the code output to the conversation as a user message
         conversation.add_message("user", code_output)
@@ -227,11 +234,10 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
 
 
 
-
 def interact_chat(conversation, chatbot, filename, sys_message=None, auto_prompt=False, feedback_chatbot=None):
     try:
         if sys_message == None:
-            sys_message = "You are a python programmer bot, you strive to give complete, coherent, printful verbose and bug free code. Always provide the complete code, not in parts, the entire thing, Make the code a single block"
+            sys_message = "You are a python programmer bot, you strive to give complete, coherent, printful verbose and bug free code. Always provide the complete code, never in parts, always the entire thing, Make the code a single block"
 
         conversation.add_message("system", sys_message)
         while True:
@@ -240,7 +246,7 @@ def interact_chat(conversation, chatbot, filename, sys_message=None, auto_prompt
             conversation.read_from_json(filename)
 
             user_input = get_multiline_input("Enter your message: ", "|")
-            conversation.add_message("user", user_input)
+            conversation.add_message("user", "Write a python script to " + user_input) ## helps steer the model to output a python script
 
             num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
             print(f"Number of tokens before response: {num_tokens}")
@@ -285,8 +291,8 @@ def main(api_key, code_file_counter):
     chatbot = Chatbot(api_key, model)
     feedback_chatbot = Chatbot(api_key, model)
     sys_message = None
-    if input("Do you want use a custom system message?? y/n): ") == "n":
-        sys_message = input("What is the system message you want to use? : ")
+  # if input("Do you want use a custom system message?? y/n): ") == "n":
+   #     sys_message = input("What is the system message you want to use? : ")
 
     auto_prompt = input("Would you like to risk your computer? (y/n): ").lower() == "y"
     auto_prompt_sys_message = None
