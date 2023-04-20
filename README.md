@@ -64,6 +64,7 @@ Note:
 WARNING: This program can potentially execute harmful code. Please use it with caution and review the generated code before execution.
 When the token count reaches 4k, the program will halt. A feature to forget past messages will be implemented at some point.
 
-Also, `input()` causes problems
+If the code haults, it might be waiting for your input. If that does not work, use `CTRL + C` to stop the program instance without stopping the conversation instance.
+
 
 Enjoy interacting with the chatbot and exploring the power of code execution!
