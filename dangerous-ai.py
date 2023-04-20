@@ -7,7 +7,11 @@ import tempfile
 import time
 import traceback
 import itertools
+import platform
+from io import StringIO
 
+
+#
 
 api_key = "sk-"
 
@@ -115,12 +119,9 @@ def get_multiline_input(prompt, end_word):
 
 
 
-
 def execute_code_and_get_output(code, file_counter):
     global code_file_counter
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", dir=temp_dir) as temp:
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".py") as temp:
         temp.write(code)
         temp.flush()
 
@@ -180,12 +181,33 @@ def execute_code_and_get_output(code, file_counter):
         process.stderr.close()
 
     code_file_counter += 1
+    time.sleep(10)
     return output
 
 
 
 
+def run_code_in_current_environment(code):
+    old_stdout = sys.stdout
+    redirected_output = sys.stdout = StringIO()
+    try:
+        exec(code)
+    except Exception as e:
+        print(f"Error: {e}")
+        tb_str = traceback.format_exception(type(e), e, e.__traceback__)
+        print("".join(tb_str))
+    finally:
+        sys.stdout = old_stdout
+
+    output = redirected_output.getvalue()
+    redirected_output.close()
+    time.sleep(10)
+    return output
+
+
 def autoprompt_v2(conversation, chatbot, filename, file_counter):
+    global code_file_counter
+
     last_message = conversation.messages[-1]["content"]
     print(last_message)
 
@@ -199,20 +221,30 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
 
     if code_start != -1 and code_end != -1:
         python_code = last_message[code_start + (len("```python") if "```python" in last_message else len("```")):code_end].strip()
-        python_code = python_code.lstrip("python").strip()  # Remove "python" from the start of the code block
+        if python_code.startswith("python"):  # Check if "python" is at the start of the code block
+            python_code = python_code.lstrip("python").strip()  # Remove "python" from the start of the code block
         print("---")
         print("Python code to execute:")
         print(python_code)
 
+        # Save the code to a file with a counter in the file name
+        code_file_name = f"generated_code_{code_file_counter}.py"
+        with open(code_file_name, "w") as f:
+            f.write(python_code)
+        code_file_counter += 1
+
         # Execute the code and get the output
-        code_output = execute_code_and_get_output(python_code, file_counter)
+        if platform.system() == "Windows":
+            code_output = run_code_in_current_environment(python_code)
+        else:
+            code_output = execute_code_and_get_output(python_code, file_counter)
+
         print("---")
         print("Code output:")
         print(code_output)
 
         # Add the executed code to the message before the output
         code_output = f"Executed code: \" \n```\n{python_code}\n```\n\" Output:\n{code_output} \" Make sure you give the entire code"
-
 
         # Add the code output to the conversation as a user message
         conversation.add_message("user", code_output)
@@ -231,6 +263,8 @@ def autoprompt_v2(conversation, chatbot, filename, file_counter):
         print("---")
         print("No Python code found in the last message.")
         return None
+
+
 
 
 
