@@ -362,3 +362,6 @@ def main(api_key, code_file_counter):
    
 
     conversation.write_to_json(conversation_filename)
+
+if __name__ == "__main__":
+    main(api_key, code_file_counter)
