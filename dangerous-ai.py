@@ -11,8 +11,6 @@ import platform
 from io import StringIO
 
 
-#
-
 api_key = "sk-"
 
 code_file_counter = 0
@@ -23,7 +21,7 @@ class Chatbot:
     def __init__(self, api_key, model):
         self.api_key = api_key
         self.model = model
-        
+       
     def trim_conversation(self, conversation, tokens_to_trim):
         conversation_length = sum(len(msg["content"]) for msg in conversation.messages)
         while conversation_length > 3700 - tokens_to_trim:
@@ -120,6 +118,7 @@ def get_multiline_input(prompt, end_word):
 
 
 def execute_code_and_get_output(code, file_counter):
+    input()
     global code_file_counter
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".py") as temp:
         temp.write(code)
@@ -188,6 +187,7 @@ def execute_code_and_get_output(code, file_counter):
 
 
 def run_code_in_current_environment(code):
+    input()
     old_stdout = sys.stdout
     redirected_output = sys.stdout = StringIO()
     try:
@@ -201,69 +201,93 @@ def run_code_in_current_environment(code):
 
     output = redirected_output.getvalue()
     redirected_output.close()
-    time.sleep(10)
+   # time.sleep(10)
+    input()
     return output
 
 
 def autoprompt_v2(conversation, chatbot, filename, file_counter):
     global code_file_counter
 
-    last_message = conversation.messages[-1]["content"]
-    print(last_message)
+    while True:
+        last_message = conversation.messages[-1]["content"]
+        print(last_message)
 
-    # Extract Python code from the message
-    code_start = last_message.find("```python")
-    if code_start == -1:
-        code_start = last_message.find("```")
-        code_end = last_message.find("```", code_start + len("```"))
-    else:
-        code_end = last_message.find("```", code_start + len("```python"))
-
-    if code_start != -1 and code_end != -1:
-        python_code = last_message[code_start + (len("```python") if "```python" in last_message else len("```")):code_end].strip()
-        if python_code.startswith("python"):  # Check if "python" is at the start of the code block
-            python_code = python_code.lstrip("python").strip()  # Remove "python" from the start of the code block
-        print("---")
-        print("Python code to execute:")
-        print(python_code)
-
-        # Save the code to a file with a counter in the file name
-        code_file_name = f"generated_code_{code_file_counter}.py"
-        with open(code_file_name, "w") as f:
-            f.write(python_code)
-        code_file_counter += 1
-
-        # Execute the code and get the output
-        if platform.system() == "Windows":
-            code_output = run_code_in_current_environment(python_code)
+        # Extract Python code from the message
+        code_start = last_message.find("```python")
+        if code_start == -1:
+            code_start = last_message.find("```")
+            code_end = last_message.find("```", code_start + len("```"))
         else:
-            code_output = execute_code_and_get_output(python_code, file_counter)
+            code_end = last_message.find("```", code_start + len("```python"))
 
-        print("---")
-        print("Code output:")
-        print(code_output)
+        if code_start != -1 and code_end != -1:
+            python_code = last_message[code_start + (len("```python") if "```python" in last_message else len("```")):code_end].strip()
+            if python_code.startswith("python"):  # Check if "python" is at the start of the code block
+                python_code = python_code.lstrip("python").strip()  # Remove "python" from the start of the code block
+            print("---")
+            print("Python code to execute:")
+            print(python_code)
 
-        # Add the executed code to the message before the output
-        code_output = f"Executed code: \" \n```\n{python_code}\n```\n\" Output:\n{code_output} \" Make sure you give the entire code"
+            # Save the code to a file with a counter in the file name
+            code_file_name = f"generated_code_{code_file_counter}.py"
+            with open(code_file_name, "w") as f:
+                f.write(python_code)
+            code_file_counter += 1
 
-        # Add the code output to the conversation as a user message
-        conversation.add_message("user", code_output)
-        num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
-        print(f"Number of tokens after response: {num_tokens}")
-        
-        # Get the response from the chatbot based on the code output
-        response = chatbot.chat_completion_api(conversation)
-        content = response["response"]
+            code_output = run_code(python_code, file_counter)
+            print("---")
+            print("Code output:")
+            print(code_output)
 
-        # Save the conversation
-        conversation.write_to_json(filename)
+            # Add the executed code to the message before the output
+            code_output = f"Executed code: \" \n```\n{python_code}\n```\n\" Output:\n{code_output} \" Make sure you give the entire code"
 
-        return content
+            while True:
+                # Prompt the user for additional messages
+                print("Add to the message?")
+                additional_message = input()
+
+                # If the user enters RESET, run the code again and prompt again
+                if additional_message.strip() == "RESET":
+                    code_output = run_code(python_code, file_counter)
+                    print("---")
+                    print("Code output:")
+                    print(code_output)
+
+                    # Add the executed code to the message before the output
+                    code_output = f"Executed code: \" \n```\n{python_code}\n```\n\" Output:\n{code_output} \" Make sure you give the entire code"
+                    continue
+
+                # Otherwise, add the message to the conversation and break the loop
+                conversation.add_message("user", code_output + additional_message)
+                num_tokens = sum(len(msg["content"]) for msg in conversation.messages) // 4
+                print(f"Number of tokens after response: {num_tokens}")
+                break
+
+            # Get the response from the chatbot based on the code output
+            response = chatbot.chat_completion_api(conversation)
+            content = response["response"]
+
+            # Save the conversation
+            conversation.write_to_json(filename)
+
+            return content
+        else:
+            print("---")
+            print("No Python code found in the last message.")
+            return None
+
+
+
+def run_code(python_code, file_counter=0):
+    # Execute the code and get the output
+    if platform.system() == "Windows":
+        code_output = run_code_in_current_environment(python_code)
     else:
-        print("---")
-        print("No Python code found in the last message.")
-        return None
+        code_output = execute_code_and_get_output(python_code, file_counter)
 
+    return code_output
 
 
 
@@ -312,11 +336,8 @@ def main(api_key, code_file_counter):
 
     conversation_name = input("Enter conversation name: ")
     conversation_filename = f"{conversation_name}.json"
-
-    if input("Do you want to create a new conversation or load an existing one? (c/l): ") == "c":
-        conversation = Conversation()
-    else:
-        conversation = Conversation()
+    conversation = Conversation()
+    if input("Do you want to create a new conversation or load an existing one? (c/l): ") == "l":
         conversation.read_from_json(conversation_filename)
 
    
@@ -328,21 +349,16 @@ def main(api_key, code_file_counter):
   # if input("Do you want use a custom system message?? y/n): ") == "n":
    #     sys_message = input("What is the system message you want to use? : ")
 
-    auto_prompt = input("Would you like to risk your computer? (y/n): ").lower() == "y"
+    auto_prompt = True#input("Would you like to risk your computer? (y/n): ").lower() == "y"
     auto_prompt_sys_message = None
-    
-        
+   
+       
 ##continuously run?
 
-            
+           
 
     interact_chat(conversation, chatbot, conversation_filename, sys_message, auto_prompt, feedback_chatbot)
 
    
 
     conversation.write_to_json(conversation_filename)
-
-
-
-if __name__ == "__main__":
-    main(api_key, code_file_counter)
