@@ -62,7 +62,7 @@ Inputs: like these produce good results because it allows the AI to have feedbac
 Note:
 
 WARNING: This program can potentially execute harmful code. Please use it with caution and review the generated code before execution.
-When the token count reaches 4k, the program will halt. A feature to forget past messages will be implemented at some point.
+When the token count reaches 4k, the program will halt.
 
 If the code haults, it might be waiting for your input. If that does not work, use `CTRL + C` to stop the program instance without stopping the conversation instance.
 
